@@ -1,0 +1,5 @@
+outs:
+- md5: 28032df1cd44bc3a87667a7278f6cf61
+  size: 9437381
+  hash: md5
+  path: ikman_cars_last_month.csv

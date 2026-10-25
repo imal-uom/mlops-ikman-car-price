@@ -1,0 +1,39 @@
+data:
+  raw: data/raw/ikman_cars_last_month.csv      # scraped ads, tracked with DVC (not a pipeline stage)
+  production: data/production/labelled.csv      # production predictions that received real prices
+  processed_dir: data/processed
+  eval_frac: 0.70        # ads up to this quantile of posting day = train
+  future_frac: 0.90      # ... until this quantile = eval; the newest ads = "future" traffic for the replayer
+  holdout_frac: 0.3      # newest share of labelled production rows used to judge retrained models
+  min_price: 300000      # LKR; below this a "price" is a placeholder or a deposit
+  max_price: 300000000   # LKR; above this it is a typo
+  seed: 42
+
+model:
+  name: ikman-car-price        # name in the MLflow model registry
+  experiment: ikman-car-price
+  cat_features: [brand, model, edition, fuel_type, transmission, body, condition, district, seller_type]
+  lightgbm:
+    objective: regression      # on log(price): depreciation is a percentage, not a sum
+    learning_rate: 0.03
+    n_estimators: 3000         # upper bound; early stopping decides the real number
+    num_leaves: 31
+    min_child_samples: 20
+    subsample: 0.8
+    subsample_freq: 1
+    colsample_bytree: 0.8
+    reg_lambda: 1.0
+    random_state: 42
+    verbose: -1
+  early_stopping_rounds: 100
+  validation_frac: 0.1         # slice of train held out for early stopping
+
+evaluate:
+  conformal_alpha: 0.10        # 90% price range
+  gate_metric: median_ape      # metric a challenger must improve to replace the champion
+  gate_lower_is_better: true
+  gate_min_delta: 0.0
+
+monitor:
+  drift_share_threshold: 0.3   # retrain when at least 30% of features have drifted...
+  min_labelled_rows: 500       # ...and we have enough production rows with real prices

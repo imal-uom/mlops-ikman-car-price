@@ -1,0 +1,47 @@
+stages:
+  prepare:
+    cmd: uv run python -m src.data
+    deps:
+      - src/data.py
+      - src/features.py
+      - data/raw/ikman_cars_last_month.csv
+      - data/production/labelled.csv
+    params:
+      - data
+    outs:
+      - data/processed/train.csv
+      - data/processed/eval.csv
+      - data/processed/future.csv
+
+  train:
+    cmd: uv run python -m src.train
+    deps:
+      - src/train.py
+      - src/features.py
+      - data/processed/train.csv
+    params:
+      - model
+    outs:
+      - models/model.txt
+      - models/encoders.json
+      - run_info.json:
+          cache: false
+
+  evaluate:
+    cmd: uv run python -m src.evaluate
+    deps:
+      - src/evaluate.py
+      - src/metrics.py
+      - models/model.txt
+      - models/encoders.json
+      - data/processed/eval.csv
+    params:
+      - evaluate.conformal_alpha
+    outs:
+      - models/conformal.json
+    metrics:
+      - eval_metrics.json:
+          cache: false
+    plots:
+      - plots/shap_summary.png:
+          cache: false
