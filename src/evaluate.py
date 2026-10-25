@@ -43,12 +43,15 @@ def main() -> None:
 
     metrics = score(y, pred_log)
     metrics["eval_rows"] = len(df)
-    (ROOT / "eval_metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
+    # newline="\n": DVC hashes these files, and Windows would otherwise write CRLF
+    with open(ROOT / "eval_metrics.json", "w", newline="\n") as f:
+        f.write(json.dumps(metrics, indent=2) + "\n")
     print(json.dumps(metrics, indent=2))
 
     q = conformal_width(y, pred_log, alpha)
     conformal = {"alpha": alpha, "q_log": q, "factor": float(np.exp(q))}
-    (ROOT / "models" / "conformal.json").write_text(json.dumps(conformal, indent=2) + "\n")
+    with open(ROOT / "models" / "conformal.json", "w", newline="\n") as f:
+        f.write(json.dumps(conformal, indent=2) + "\n")
     print(f"90% price range: prediction x/÷ {np.exp(q):.2f}")
 
     # SHAP: how much each feature pushed each prediction up or down (in log price).
