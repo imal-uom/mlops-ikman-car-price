@@ -41,7 +41,9 @@ def test_deposit_price_is_quarantined():
     assert pricing_status("Monthly rental 85,000", 85_000) == "partial_payment"
     assert pricing_status("Lease transfer, 24 months remaining", 1_500_000) == "lease_transfer"
     assert pricing_status("Leasing can be arranged.", 8_000_000) == "full_price"
-    assert pricing_status("Full price 8.5M, down payment 2M", 8_500_000) == "payment_terms_mentioned"
+    assert (
+        pricing_status("Full price 8.5M, down payment 2M", 8_500_000) == "payment_terms_mentioned"
+    )
 
 
 def test_negation_aware_flags():

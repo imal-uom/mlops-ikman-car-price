@@ -1,0 +1,142 @@
+schema: '2.0'
+stages:
+  prepare:
+    cmd: uv run python -m src.data
+    deps:
+    - path: data/production/labelled.csv
+      hash: md5
+      md5: cece6102044f7b5d7da895a5581e601f
+      size: 209
+    - path: data/raw/ikman_cars_last_month.csv
+      hash: md5
+      md5: 28032df1cd44bc3a87667a7278f6cf61
+      size: 9437381
+    - path: src/data.py
+      hash: md5
+      md5: 53a25a507da9ce940a9e196d74e57d4b
+      size: 4399
+    - path: src/features.py
+      hash: md5
+      md5: 41a289018b9e0ae544d788b2c65589f1
+      size: 9400
+    params:
+      params.yaml:
+        data:
+          raw: data/raw/ikman_cars_last_month.csv
+          production: data/production/labelled.csv
+          processed_dir: data/processed
+          eval_frac: 0.7
+          future_frac: 0.9
+          holdout_frac: 0.3
+          min_price: 300000
+          max_price: 300000000
+          seed: 42
+    outs:
+    - path: data/processed/eval.csv
+      hash: md5
+      md5: 157d9afa348f512f9a4242f5ddb0d7b3
+      size: 1088305
+    - path: data/processed/future.csv
+      hash: md5
+      md5: 11b7b7361714dec410a527d6cc239ab3
+      size: 1192748
+    - path: data/processed/train.csv
+      hash: md5
+      md5: d537066014120dea30a6bbcfafb08a32
+      size: 5733462
+  train:
+    cmd: uv run python -m src.train
+    deps:
+    - path: data/processed/train.csv
+      hash: md5
+      md5: d537066014120dea30a6bbcfafb08a32
+      size: 5733462
+    - path: src/features.py
+      hash: md5
+      md5: 41a289018b9e0ae544d788b2c65589f1
+      size: 9400
+    - path: src/train.py
+      hash: md5
+      md5: 47593092273640d7f6f0c9c6c0bb487e
+      size: 3028
+    params:
+      params.yaml:
+        model:
+          name: ikman-car-price
+          experiment: ikman-car-price
+          cat_features:
+          - brand
+          - model
+          - edition
+          - fuel_type
+          - transmission
+          - body
+          - condition
+          - district
+          - seller_type
+          lightgbm:
+            objective: regression
+            learning_rate: 0.03
+            n_estimators: 3000
+            num_leaves: 31
+            min_child_samples: 20
+            subsample: 0.8
+            subsample_freq: 1
+            colsample_bytree: 0.8
+            reg_lambda: 1.0
+            random_state: 42
+            verbose: -1
+          early_stopping_rounds: 100
+          validation_frac: 0.1
+    outs:
+    - path: models/encoders.json
+      hash: md5
+      md5: e4aca2b769b1a0c8c792f9232717b978
+      size: 5614
+    - path: models/model.txt
+      hash: md5
+      md5: 2149b360fcdb57f24fd41d7effb18311
+      size: 871947
+    - path: run_info.json
+      hash: md5
+      md5: d54c183e586163f940396e25bf7f6c41
+      size: 116
+  evaluate:
+    cmd: uv run python -m src.evaluate
+    deps:
+    - path: data/processed/eval.csv
+      hash: md5
+      md5: 157d9afa348f512f9a4242f5ddb0d7b3
+      size: 1088305
+    - path: models/encoders.json
+      hash: md5
+      md5: e4aca2b769b1a0c8c792f9232717b978
+      size: 5614
+    - path: models/model.txt
+      hash: md5
+      md5: 2149b360fcdb57f24fd41d7effb18311
+      size: 871947
+    - path: src/evaluate.py
+      hash: md5
+      md5: d1150d8be970c136cc74d7620d66b84c
+      size: 2867
+    - path: src/metrics.py
+      hash: md5
+      md5: 834b8025fee3d533e37dfb41d2a5dabd
+      size: 995
+    params:
+      params.yaml:
+        evaluate.conformal_alpha: 0.1
+    outs:
+    - path: eval_metrics.json
+      hash: md5
+      md5: 6c1755ef686b7aff16d6ce4027dcf831
+      size: 244
+    - path: models/conformal.json
+      hash: md5
+      md5: 5c651557873b040831ad50ea6282e354
+      size: 88
+    - path: plots/shap_summary.png
+      hash: md5
+      md5: c35ad9154b66934e757c063902c9c29d
+      size: 86445
