@@ -67,7 +67,9 @@ def main() -> None:
         out.mkdir(exist_ok=True)
         model.booster_.save_model(str(out / "model.txt"))  # LightGBM's own text format
         spec = {"features": FEATURES, "categorical": CAT_FEATURES, "encoders": encoders}
-        (out / "encoders.json").write_text(json.dumps(spec, indent=1))
+        # newline="\n" everywhere: DVC hashes these files, and Windows would otherwise write CRLF
+        with open(out / "encoders.json", "w", newline="\n") as f:
+            json.dump(spec, f, indent=1)
 
         sample = X.head(200)
         info = mlflow.lightgbm.log_model(
@@ -78,7 +80,8 @@ def main() -> None:
         )
         mlflow.log_artifact(str(out / "encoders.json"))
         run_info = {"run_id": run.info.run_id, "model_uri": info.model_uri}
-        (ROOT / "run_info.json").write_text(json.dumps(run_info, indent=2) + "\n")
+        with open(ROOT / "run_info.json", "w", newline="\n") as f:
+            f.write(json.dumps(run_info, indent=2) + "\n")
         print(f"Trained {model.best_iteration_} trees on {len(df)} ads")
         print(f"Logged run {run.info.run_id} -> {info.model_uri}")
 
