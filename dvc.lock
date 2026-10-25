@@ -5,8 +5,8 @@ stages:
     deps:
     - path: data/production/labelled.csv
       hash: md5
-      md5: cece6102044f7b5d7da895a5581e601f
-      size: 209
+      md5: 5180899e6e22929037b09c27a8e4fadd
+      size: 762137
     - path: data/raw/ikman_cars_last_month.csv
       hash: md5
       md5: 28032df1cd44bc3a87667a7278f6cf61
@@ -34,23 +34,23 @@ stages:
     outs:
     - path: data/processed/eval.csv
       hash: md5
-      md5: 157d9afa348f512f9a4242f5ddb0d7b3
-      size: 1088305
+      md5: 7e6d0f97aff81840f35b730f33ee352d
+      size: 206489
     - path: data/processed/future.csv
       hash: md5
-      md5: 11b7b7361714dec410a527d6cc239ab3
-      size: 1192748
+      md5: 8d67b45043b0deaf826c767e038231da
+      size: 1191590
     - path: data/processed/train.csv
       hash: md5
-      md5: d537066014120dea30a6bbcfafb08a32
-      size: 5733462
+      md5: b5323aa58981a6282229b39651b11b5e
+      size: 7321792
   train:
     cmd: uv run python -m src.train
     deps:
     - path: data/processed/train.csv
       hash: md5
-      md5: d537066014120dea30a6bbcfafb08a32
-      size: 5733462
+      md5: b5323aa58981a6282229b39651b11b5e
+      size: 7321792
     - path: src/features.py
       hash: md5
       md5: 41a289018b9e0ae544d788b2c65589f1
@@ -91,31 +91,31 @@ stages:
     outs:
     - path: models/encoders.json
       hash: md5
-      md5: 049531a85357bde0a44aee92fbcae056
-      size: 5226
+      md5: 742f6e5975fc68d6de72a6c00e19f4d1
+      size: 5823
     - path: models/model.txt
       hash: md5
-      md5: 2149b360fcdb57f24fd41d7effb18311
-      size: 871947
+      md5: 7d42289abfb2bd61bba6e142c3596171
+      size: 1206166
     - path: run_info.json
       hash: md5
-      md5: e28e79169dc1a9acf3c02694ea8183bb
+      md5: c6f4bd029291a378d8fc31a0b9cbef7a
       size: 112
   evaluate:
     cmd: uv run python -m src.evaluate
     deps:
     - path: data/processed/eval.csv
       hash: md5
-      md5: 157d9afa348f512f9a4242f5ddb0d7b3
-      size: 1088305
+      md5: 7e6d0f97aff81840f35b730f33ee352d
+      size: 206489
     - path: models/encoders.json
       hash: md5
-      md5: 049531a85357bde0a44aee92fbcae056
-      size: 5226
+      md5: 742f6e5975fc68d6de72a6c00e19f4d1
+      size: 5823
     - path: models/model.txt
       hash: md5
-      md5: 2149b360fcdb57f24fd41d7effb18311
-      size: 871947
+      md5: 7d42289abfb2bd61bba6e142c3596171
+      size: 1206166
     - path: src/evaluate.py
       hash: md5
       md5: 8eb47e0bccf18d19e115a30755dc97b0
@@ -130,13 +130,13 @@ stages:
     outs:
     - path: eval_metrics.json
       hash: md5
-      md5: baeb02e5ed17ac7130d3e71d45dba8d5
-      size: 235
+      md5: 4185d36a293d21dddb1168ebeb359553
+      size: 233
     - path: models/conformal.json
       hash: md5
-      md5: 27dee4b5fdf7767c9b5c596e56328f23
-      size: 83
+      md5: c963f4589703d80f2893e2450e41b09c
+      size: 81
     - path: plots/shap_summary.png
       hash: md5
-      md5: c35ad9154b66934e757c063902c9c29d
-      size: 86445
+      md5: 7f5fca9383aa73c1aa89249da9614c10
+      size: 91736
