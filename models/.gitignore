@@ -1,3 +1,5 @@
 /model.txt
 /encoders.json
 /conformal.json
+/ebm.joblib
+/spec.json

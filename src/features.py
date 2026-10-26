@@ -213,33 +213,73 @@ def build_features(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def encode(df: pd.DataFrame, encoders: dict | None = None):
-    """Categorical text -> integer codes for LightGBM. Fit when encoders is None, else apply.
+# ------------------------------------------------- model spec: levels and typical prices ---
+# The EBM takes categorical text as it is. What it needs fitted on the training fold is (a) the
+# list of levels, with rare models and editions grouped as "other", and (b) the "typical price"
+# of each brand and model: a smoothed median of log price, which gives an additive model the
+# per-model price level that it cannot build from pairwise terms alone.
+RARE_MIN = {"model": 5, "edition": 10}
+TYPICAL_FEATURES = ["typical_price_brand", "typical_price_model", "model_support"]
+MODEL_FEATURES = FEATURES + TYPICAL_FEATURES
 
-    Rare models (< 5 ads) and editions (< 10) are grouped as "other" when fitting; at inference
-    an unseen value maps to "other" if that bucket exists, otherwise to missing.
-    """
-    X = df[FEATURES].copy()
-    fitting = encoders is None
-    encoders = {} if fitting else dict(encoders)
+
+def fit_spec(df: pd.DataFrame, prior: int = 5) -> dict:
+    """Learn the categorical levels and the typical-price tables from the training ads."""
+    X = df.copy()
+    levels = {}
     for c in CAT_FEATURES:
-        if fitting:
-            counts = X[c].value_counts()
-            min_n = {"model": 5, "edition": 10}.get(c, 1)
-            keep = counts[counts >= min_n].index
-            X[c] = X[c].where(X[c].isin(keep) | X[c].isna(), "other")
-            encoders[c] = sorted(X[c].dropna().unique().tolist())
-        cats = encoders[c]
+        counts = X[c].value_counts()
+        keep = counts[counts >= RARE_MIN.get(c, 1)].index
+        X[c] = X[c].where(X[c].isin(keep) | X[c].isna(), "other")
+        levels[c] = sorted(X[c].dropna().unique().tolist())
+    y = np.log(X[TARGET].astype(float))
+    by_brand = X.assign(_y=y).groupby("brand")["_y"].agg(["median", "size"])
+    by_model = X.assign(_y=y).groupby(["brand", "model"])["_y"].agg(["median", "size"])
+    return {
+        "features": MODEL_FEATURES,
+        "categorical": CAT_FEATURES,
+        "levels": levels,
+        "typical": {
+            "prior": prior,
+            "global_median": float(y.median()),
+            "brand": {b: [float(r["median"]), int(r["size"])] for b, r in by_brand.iterrows()},
+            "model": {
+                f"{b}|{m}": [float(r["median"]), int(r["size"])]
+                for (b, m), r in by_model.iterrows()
+            },
+        },
+    }
+
+
+def apply_spec(df: pd.DataFrame, spec: dict) -> pd.DataFrame:
+    """Feature columns -> model matrix. Unseen categories map to "other" (or missing),
+    numeric columns are floats, and the typical-price features come from the spec's tables."""
+    X = df[FEATURES].copy()
+    for c in CAT_FEATURES:
+        cats = spec["levels"][c]
         fallback = "other" if "other" in cats else np.nan
-        X[c] = X[c].where(X[c].isin(cats) | X[c].isna(), fallback)
-        codes = pd.Categorical(X[c], categories=cats).codes.astype("float32")
-        X[c] = np.where(codes < 0, np.nan, codes)
+        X[c] = X[c].where(X[c].isin(cats) | X[c].isna(), fallback).astype(object)
     for c in NUM_FEATURES:
         X[c] = pd.to_numeric(X[c], errors="coerce").astype("float64")
-    return X, encoders
+
+    t = spec["typical"]
+    prior, glob = t["prior"], t["global_median"]
+    brand_median = X["brand"].map(lambda b: t["brand"].get(b, [glob, 0])[0]).astype(float)
+    brand_n = X["brand"].map(lambda b: t["brand"].get(b, [glob, 0])[1]).astype(float)
+    brand_typ = (brand_median * brand_n + glob * prior) / (brand_n + prior)
+    keys = [f"{b}|{m}" for b, m in zip(X["brand"], X["model"], strict=True)]
+    model_stats = [t["model"].get(k) for k in keys]
+    model_median = pd.Series(
+        [s[0] if s else bt for s, bt in zip(model_stats, brand_typ, strict=True)], index=X.index
+    )
+    model_n = pd.Series([s[1] if s else 0 for s in model_stats], index=X.index, dtype=float)
+    X["typical_price_brand"] = brand_typ
+    X["typical_price_model"] = (model_median * model_n + brand_typ * prior) / (model_n + prior)
+    X["model_support"] = model_n
+    return X[MODEL_FEATURES]
 
 
-def prepare_inputs(df: pd.DataFrame, encoders: dict) -> pd.DataFrame:
+def prepare_inputs(df: pd.DataFrame, spec: dict) -> pd.DataFrame:
     """Raw ad columns -> model matrix, for serving. Missing optional columns are filled."""
     frame = df.copy()
     for c in RAW_INPUT:
@@ -249,5 +289,4 @@ def prepare_inputs(df: pd.DataFrame, encoders: dict) -> pd.DataFrame:
     frame["image_count"] = frame["image_count"].fillna(5)
     frame["negotiable"] = frame["negotiable"].fillna(True)
     frame["seller_verified"] = frame["seller_verified"].fillna(False)
-    X, _ = encode(build_features(standardise_names(frame)), encoders)
-    return X
+    return apply_spec(build_features(standardise_names(frame)), spec)

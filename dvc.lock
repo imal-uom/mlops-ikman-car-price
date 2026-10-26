@@ -17,8 +17,8 @@ stages:
       size: 4399
     - path: src/features.py
       hash: md5
-      md5: 41a289018b9e0ae544d788b2c65589f1
-      size: 9400
+      md5: 47ec2d32b40a775bde27105e2b0ae408
+      size: 11388
     params:
       params.yaml:
         data:
@@ -53,12 +53,12 @@ stages:
       size: 5733462
     - path: src/features.py
       hash: md5
-      md5: 41a289018b9e0ae544d788b2c65589f1
-      size: 9400
+      md5: 47ec2d32b40a775bde27105e2b0ae408
+      size: 11388
     - path: src/train.py
       hash: md5
-      md5: 1f9babdd67c22c9e1448826dfac4f3d1
-      size: 3205
+      md5: c0f7a9abcff7debe4c4bfbb7ee03ba4c
+      size: 3190
     params:
       params.yaml:
         model:
@@ -74,32 +74,27 @@ stages:
           - condition
           - district
           - seller_type
-          lightgbm:
-            objective: regression
-            learning_rate: 0.03
-            n_estimators: 3000
-            num_leaves: 31
-            min_child_samples: 20
-            subsample: 0.8
-            subsample_freq: 1
-            colsample_bytree: 0.8
-            reg_lambda: 1.0
+          typical_prior: 5
+          ebm:
+            max_bins: 256
+            learning_rate: 0.01
+            max_rounds: 8000
+            early_stopping_rounds: 100
+            outer_bags: 8
+            interactions: 25
             random_state: 42
-            verbose: -1
-          early_stopping_rounds: 100
-          validation_frac: 0.1
     outs:
-    - path: models/encoders.json
+    - path: models/ebm.joblib
       hash: md5
-      md5: 049531a85357bde0a44aee92fbcae056
-      size: 5226
-    - path: models/model.txt
+      md5: 2a0bff753a4f05a4aa743ca4722c1af8
+      size: 6095195
+    - path: models/spec.json
       hash: md5
-      md5: 2149b360fcdb57f24fd41d7effb18311
-      size: 871947
+      md5: 813297756c3b811865a90af2200763b5
+      size: 24188
     - path: run_info.json
       hash: md5
-      md5: e28e79169dc1a9acf3c02694ea8183bb
+      md5: d35f134e25860b28a18ee505c0bc04a6
       size: 112
   evaluate:
     cmd: uv run python -m src.evaluate
@@ -108,18 +103,18 @@ stages:
       hash: md5
       md5: 157d9afa348f512f9a4242f5ddb0d7b3
       size: 1088305
-    - path: models/encoders.json
+    - path: models/ebm.joblib
       hash: md5
-      md5: 049531a85357bde0a44aee92fbcae056
-      size: 5226
-    - path: models/model.txt
+      md5: 2a0bff753a4f05a4aa743ca4722c1af8
+      size: 6095195
+    - path: models/spec.json
       hash: md5
-      md5: 2149b360fcdb57f24fd41d7effb18311
-      size: 871947
+      md5: 813297756c3b811865a90af2200763b5
+      size: 24188
     - path: src/evaluate.py
       hash: md5
-      md5: 8eb47e0bccf18d19e115a30755dc97b0
-      size: 3028
+      md5: 459fbb70afff4d0a51d410fd535b82c3
+      size: 3154
     - path: src/metrics.py
       hash: md5
       md5: 834b8025fee3d533e37dfb41d2a5dabd
@@ -130,13 +125,13 @@ stages:
     outs:
     - path: eval_metrics.json
       hash: md5
-      md5: baeb02e5ed17ac7130d3e71d45dba8d5
+      md5: a2cdb0bfaf2110ad8f611eaf2aeba574
       size: 235
     - path: models/conformal.json
       hash: md5
-      md5: 27dee4b5fdf7767c9b5c596e56328f23
+      md5: 915751b588f519cd5584c3dca1015a99
       size: 83
-    - path: plots/shap_summary.png
+    - path: plots/term_importance.png
       hash: md5
-      md5: c35ad9154b66934e757c063902c9c29d
-      size: 86445
+      md5: 62ec7c176afa54a3649381c851395031
+      size: 47584

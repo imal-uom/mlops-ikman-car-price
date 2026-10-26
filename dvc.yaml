@@ -22,8 +22,8 @@ stages:
     params:
       - model
     outs:
-      - models/model.txt
-      - models/encoders.json
+      - models/ebm.joblib
+      - models/spec.json
       - run_info.json:
           cache: false
 
@@ -32,8 +32,8 @@ stages:
     deps:
       - src/evaluate.py
       - src/metrics.py
-      - models/model.txt
-      - models/encoders.json
+      - models/ebm.joblib
+      - models/spec.json
       - data/processed/eval.csv
     params:
       - evaluate.conformal_alpha
@@ -43,5 +43,5 @@ stages:
       - eval_metrics.json:
           cache: false
     plots:
-      - plots/shap_summary.png:
+      - plots/term_importance.png:
           cache: false

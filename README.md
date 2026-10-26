@@ -5,7 +5,7 @@ versioned data (DVC on DagsHub), tracked experiments and a model registry with a
 (MLflow on DagsHub), a FastAPI service on Azure Container Apps with canary releases, drift
 monitoring, and automated retraining.
 
-The model is LightGBM on log(price) with a split-conformal 90% price range. On ads posted after
+The model is an Explainable Boosting Machine (EBM) on log(price) with a split-conformal 90% price range. On ads posted after
 its training window it has a median error of about 6% and 85% of ads within 20%.
 
 | Folder | What it holds |
