@@ -1,27 +1,26 @@
-"""Score the trained model on the evaluation set, size the price range, explain with SHAP."""
+"""Score the trained model on the evaluation set, size the price range, plot what it learned."""
 
 import json
 
 import matplotlib
 
 matplotlib.use("Agg")
-import lightgbm as lgb  # noqa: E402
+import joblib  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import mlflow  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
-import shap  # noqa: E402
 
 from src import tracking  # noqa: E402
 from src.config import ROOT, load_params  # noqa: E402
-from src.features import FEATURES, TARGET, build_features, encode  # noqa: E402
+from src.features import TARGET, apply_spec, build_features  # noqa: E402
 from src.metrics import score  # noqa: E402
 
 
 def load_model(folder):
-    booster = lgb.Booster(model_file=str(folder / "model.txt"))
-    encoders = json.loads((folder / "encoders.json").read_text())["encoders"]
-    return booster, encoders
+    model = joblib.load(folder / "ebm.joblib")
+    spec = json.loads((folder / "spec.json").read_text())
+    return model, spec
 
 
 def conformal_width(y_price, pred_log, alpha: float) -> float:
@@ -31,15 +30,28 @@ def conformal_width(y_price, pred_log, alpha: float) -> float:
     return float(np.sort(resid)[rank - 1])
 
 
+def term_importance_plot(model, path, top: int = 20) -> None:
+    """The EBM's global explanation: mean |contribution| of every term to log price."""
+    data = model.explain_global().data()
+    importance = pd.Series(data["scores"], index=data["names"]).sort_values().tail(top)
+    plt.figure(figsize=(8, 6))
+    importance.plot(kind="barh", color="#177e89")
+    plt.xlabel("mean |term contribution| to log price")
+    plt.title(f"EBM term importance ({top} of {len(data['names'])} terms)")
+    plt.tight_layout()
+    plt.savefig(path, dpi=120)
+    plt.close("all")
+
+
 def main() -> None:
     tracking.configure()
     params = load_params()
     alpha = params["evaluate"]["conformal_alpha"]
     df = build_features(pd.read_csv(ROOT / params["data"]["processed_dir"] / "eval.csv"))
-    booster, encoders = load_model(ROOT / "models")
-    X, _ = encode(df, encoders)
+    model, spec = load_model(ROOT / "models")
+    X = apply_spec(df, spec)
     y = df[TARGET].to_numpy(dtype=float)
-    pred_log = booster.predict(X)
+    pred_log = model.predict(X)
 
     metrics = score(y, pred_log)
     metrics["eval_rows"] = len(df)
@@ -54,17 +66,9 @@ def main() -> None:
         f.write(json.dumps(conformal, indent=2) + "\n")
     print(f"90% price range: prediction x/÷ {np.exp(q):.2f}")
 
-    # SHAP: how much each feature pushed each prediction up or down (in log price).
-    sample = X.sample(min(500, len(X)), random_state=0)
-    explanation = shap.TreeExplainer(booster)(sample)
-    explanation.feature_names = FEATURES
-    plot_path = ROOT / "plots" / "shap_summary.png"
+    plot_path = ROOT / "plots" / "term_importance.png"
     plot_path.parent.mkdir(exist_ok=True)
-    plt.figure()
-    shap.plots.beeswarm(explanation, max_display=14, show=False)
-    plt.tight_layout()
-    plt.savefig(plot_path, dpi=120)
-    plt.close("all")
+    term_importance_plot(model, plot_path)
 
     run_id = json.loads((ROOT / "run_info.json").read_text())["run_id"]
     with mlflow.start_run(run_id=run_id):

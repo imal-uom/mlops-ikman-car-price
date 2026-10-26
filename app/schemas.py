@@ -27,12 +27,21 @@ class PredictionRequest(BaseModel):
     posted_at: str | None = Field(default=None, description="ISO timestamp; defaults to now")
 
 
+class TermContribution(BaseModel):
+    term: str = Field(examples=["model_year"])
+    contribution_log: float = Field(description="this term's contribution to log(price)")
+
+
 class PredictionResponse(BaseModel):
     request_id: str
     predicted_price_lkr: float
     lower_lkr: float
     upper_lkr: float
     model_version: str
+    model_support: int = Field(default=0, description="training ads of this car's model")
+    top_terms: list[TermContribution] = Field(
+        default_factory=list, description="the EBM's largest terms for this prediction"
+    )
 
 
 class FeedbackRequest(BaseModel):

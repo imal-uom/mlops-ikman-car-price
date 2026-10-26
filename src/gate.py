@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 import mlflow
-import mlflow.lightgbm
+import mlflow.sklearn
 import pandas as pd
 from mlflow import MlflowClient
 from mlflow.exceptions import MlflowException
@@ -19,19 +19,17 @@ from mlflow.exceptions import MlflowException
 from src import tracking
 from src.config import ROOT, load_params
 from src.evaluate import load_model
-from src.features import TARGET, build_features, encode
+from src.features import TARGET, apply_spec, build_features
 from src.metrics import GATE_KEYS, score
 
 
 def load_champion(name: str):
-    """The champion's trees plus the encoders it was trained with (logged as a run artifact)."""
+    """The champion model plus the spec it was trained with (logged as a run artifact)."""
     try:
         version = MlflowClient().get_model_version_by_alias(name, "champion")
-        booster = mlflow.lightgbm.load_model(f"models:/{name}@champion")
-        path = mlflow.artifacts.download_artifacts(
-            run_id=version.run_id, artifact_path="encoders.json"
-        )
-        return booster, json.loads(Path(path).read_text())["encoders"]
+        model = mlflow.sklearn.load_model(f"models:/{name}@champion")
+        path = mlflow.artifacts.download_artifacts(run_id=version.run_id, artifact_path="spec.json")
+        return model, json.loads(Path(path).read_text())
     except MlflowException as err:
         print(f"No champion found ({err.error_code}); the first model passes automatically.")
         return None
@@ -48,16 +46,14 @@ def main() -> int:
     df = build_features(pd.read_csv(ROOT / params["data"]["processed_dir"] / "eval.csv"))
     y = df[TARGET].to_numpy(dtype=float)
 
-    challenger, challenger_encoders = load_model(ROOT / "models")
-    X_new, _ = encode(df, challenger_encoders)
-    new = score(y, challenger.predict(X_new))
+    challenger, challenger_spec = load_model(ROOT / "models")
+    new = score(y, challenger.predict(apply_spec(df, challenger_spec)))
 
     champion = load_champion(params["model"]["name"])
     old = None
     if champion:
-        booster, champion_encoders = champion
-        X_old, _ = encode(df, champion_encoders)
-        old = score(y, booster.predict(X_old))
+        model, champion_spec = champion
+        old = score(y, model.predict(apply_spec(df, champion_spec)))
 
     metric, delta = e["gate_metric"], e["gate_min_delta"]
     if old is None:

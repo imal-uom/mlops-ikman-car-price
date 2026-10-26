@@ -72,7 +72,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add data/production/labelled.csv.dvc dvc.lock run_info.json eval_metrics.json \
-            plots/shap_summary.png
+            plots/term_importance.png
           git commit -m "Retrain: $REASON"
           git push origin "$BRANCH"
           gh pr create --base main --head "$BRANCH" \

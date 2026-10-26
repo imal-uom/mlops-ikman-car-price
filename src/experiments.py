@@ -1,12 +1,13 @@
-"""Compare a linear model with gradient boosting on the same data, all tracked in MLflow.
+"""Compare a linear model with the EBM (main effects only, and with interactions) on the same
+data, all tracked in MLflow.
 
 This is exploration, separate from the production pipeline in dvc.yaml.
 """
 
-import lightgbm as lgb
 import mlflow
 import numpy as np
 import pandas as pd
+from interpret.glassbox import ExplainableBoostingRegressor
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import RidgeCV
@@ -15,7 +16,14 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from src import tracking
 from src.config import ROOT, load_params
-from src.features import CAT_FEATURES, NUM_FEATURES, TARGET, build_features, encode
+from src.features import (
+    CAT_FEATURES,
+    NUM_FEATURES,
+    TARGET,
+    apply_spec,
+    build_features,
+    fit_spec,
+)
 from src.metrics import score
 
 
@@ -41,25 +49,24 @@ def main() -> None:
         ),
         RidgeCV(alphas=np.logspace(-2, 2, 20)),
     )
-    X_tr, encoders = encode(train)
-    X_val, _ = encode(val, encoders)
+    spec = fit_spec(train, prior=params["model"]["typical_prior"])
+    X_tr, X_val = apply_spec(train, spec), apply_spec(val, spec)
+    ebm = params["model"]["ebm"]
     models = {
         "ridge": (ridge, train[CAT_FEATURES + NUM_FEATURES], val[CAT_FEATURES + NUM_FEATURES]),
-        "lightgbm": (
-            lgb.LGBMRegressor(**params["model"]["lightgbm"] | {"n_estimators": 800}),
+        "ebm-main-effects": (
+            ExplainableBoostingRegressor(**ebm | {"interactions": 0}),
             X_tr,
             X_val,
         ),
+        "ebm-interactions": (ExplainableBoostingRegressor(**ebm), X_tr, X_val),
     }
 
     mlflow.set_experiment(params["model"]["experiment"] + "-experiments")
     results = []
     for name, (model, X_fit, X_eval) in models.items():
         with mlflow.start_run(run_name=name):
-            if name == "lightgbm":
-                model.fit(X_fit, y_tr, categorical_feature=CAT_FEATURES)
-            else:
-                model.fit(X_fit, y_tr)
+            model.fit(X_fit, y_tr)
             metrics = score(y_val, model.predict(X_eval))
             mlflow.log_param("model_family", name)
             mlflow.log_metrics(metrics)

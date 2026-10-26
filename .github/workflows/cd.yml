@@ -42,7 +42,7 @@ jobs:
         run: |
           uv sync --frozen
           make dvc-auth
-          uv run dvc pull models/model.txt models/encoders.json models/conformal.json
+          uv run dvc pull models/ebm.joblib models/spec.json models/conformal.json
 
       - name: Image name (registries need lowercase)
         id: name

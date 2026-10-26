@@ -4,11 +4,12 @@ import pytest
 
 from src.data import build_sets, validate
 from src.features import (
-    FEATURES,
+    MODEL_FEATURES,
+    apply_spec,
     build_features,
     claim,
     clean,
-    encode,
+    fit_spec,
     pricing_status,
     standardise_names,
 )
@@ -60,13 +61,35 @@ def test_wagon_r_trims_fold_into_the_model():
     assert df.loc[0, "edition"] == "fx"
 
 
-def test_encode_handles_unseen_values(rows):
-    X, encoders = encode(build_features(standardise_names(rows)))
-    assert list(X.columns) == FEATURES
+def test_spec_handles_unseen_values(rows):
+    df = build_features(standardise_names(rows))
+    spec = fit_spec(df)
+    X = apply_spec(df, spec)
+    assert list(X.columns) == MODEL_FEATURES
     new = rows.head(1).copy()
     new.loc[0, "brand"] = "Lamborghini"
-    X_new, _ = encode(build_features(standardise_names(new)), encoders)
-    assert X_new.shape == (1, len(FEATURES))
+    X_new = apply_spec(build_features(standardise_names(new)), spec)
+    assert X_new.shape == (1, len(MODEL_FEATURES))
+    # an unseen brand gets the global typical price and no model support
+    assert X_new.loc[0, "typical_price_brand"] == pytest.approx(spec["typical"]["global_median"])
+    assert X_new.loc[0, "model_support"] == 0
+
+
+def test_typical_price_is_shrunk_towards_the_brand(rows):
+    df = build_features(standardise_names(rows))
+    spec = fit_spec(df, prior=5)
+    X = apply_spec(df, spec)
+    row = X.iloc[0]
+    brand, model = row["brand"], row["model"]
+    brand_median, brand_n = spec["typical"]["brand"][brand]
+    model_median, model_n = spec["typical"]["model"][f"{brand}|{model}"]
+    glob = spec["typical"]["global_median"]
+    brand_typ = (brand_median * brand_n + glob * 5) / (brand_n + 5)
+    assert row["typical_price_brand"] == pytest.approx(brand_typ)
+    assert row["typical_price_model"] == pytest.approx(
+        (model_median * model_n + brand_typ * 5) / (model_n + 5)
+    )
+    assert row["model_support"] == model_n
 
 
 def test_first_model_splits_chronologically(rows):

@@ -13,20 +13,15 @@ model:
   name: ikman-car-price        # name in the MLflow model registry
   experiment: ikman-car-price
   cat_features: [brand, model, edition, fuel_type, transmission, body, condition, district, seller_type]
-  lightgbm:
-    objective: regression      # on log(price): depreciation is a percentage, not a sum
-    learning_rate: 0.03
-    n_estimators: 3000         # upper bound; early stopping decides the real number
-    num_leaves: 31
-    min_child_samples: 20
-    subsample: 0.8
-    subsample_freq: 1
-    colsample_bytree: 0.8
-    reg_lambda: 1.0
+  typical_prior: 5             # smoothing weight (in ads) for the per-brand / per-model typical price
+  ebm:                         # Explainable Boosting Machine on log(price): a glass-box additive model
+    max_bins: 256
+    learning_rate: 0.01
+    max_rounds: 8000           # upper bound; early stopping on the internal validation slice decides
+    early_stopping_rounds: 100
+    outer_bags: 8              # bootstrap replicates; gives the bands on every shape function
+    interactions: 25           # pairwise terms chosen by FAST after the main effects
     random_state: 42
-    verbose: -1
-  early_stopping_rounds: 100
-  validation_frac: 0.1         # slice of train held out for early stopping
 
 evaluate:
   conformal_alpha: 0.10        # 90% price range

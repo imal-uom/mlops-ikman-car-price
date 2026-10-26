@@ -8,7 +8,7 @@ RUN uv sync --frozen --no-default-groups --no-install-project
 
 # ---- runtime stage: small image, no build tools, non-root user ----
 FROM python:3.12-slim
-# LightGBM needs the OpenMP runtime
+# the EBM's native library (libebm) and scikit-learn need the OpenMP runtime
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 appuser
@@ -17,7 +17,7 @@ COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 COPY app/ app/
 COPY src/__init__.py src/features.py src/
-COPY models/model.txt models/encoders.json models/conformal.json models/
+COPY models/ebm.joblib models/spec.json models/conformal.json models/
 ARG MODEL_VERSION=dev
 ENV MODEL_VERSION=${MODEL_VERSION}
 USER appuser

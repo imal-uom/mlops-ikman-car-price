@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-import lightgbm as lgb
+import joblib
 import numpy as np
 import pandas as pd
 
@@ -23,11 +23,17 @@ if os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING"):
 
 from fastapi import FastAPI  # noqa: E402
 
-from app.schemas import FeedbackRequest, PredictionRequest, PredictionResponse  # noqa: E402
+from app.schemas import (  # noqa: E402
+    FeedbackRequest,
+    PredictionRequest,
+    PredictionResponse,
+    TermContribution,
+)
 from src.features import prepare_inputs  # noqa: E402
 
 MODELS_DIR = Path(os.getenv("MODELS_DIR", "models"))
 MODEL_VERSION = os.getenv("MODEL_VERSION", "dev")
+TOP_TERMS = 5
 STATE: dict = {}
 
 # A dedicated logger writes one complete JSON line per event. The handler's lock stops
@@ -47,9 +53,10 @@ def log_event(event: dict) -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    STATE["model"] = lgb.Booster(model_file=str(MODELS_DIR / "model.txt"))
-    STATE["encoders"] = json.loads((MODELS_DIR / "encoders.json").read_text())["encoders"]
+    STATE["model"] = joblib.load(MODELS_DIR / "ebm.joblib")
+    STATE["spec"] = json.loads((MODELS_DIR / "spec.json").read_text())
     STATE["q_log"] = json.loads((MODELS_DIR / "conformal.json").read_text())["q_log"]
+    STATE["terms"] = list(STATE["model"].term_names_)
     yield
     STATE.clear()
 
@@ -67,11 +74,21 @@ def version() -> dict:
     return {"model_version": MODEL_VERSION}
 
 
+def top_terms(X: pd.DataFrame) -> list[TermContribution]:
+    """The EBM's own decomposition of this prediction: the largest terms, exactly."""
+    scores = STATE["model"].eval_terms(X)[0]
+    order = np.argsort(-np.abs(scores))[:TOP_TERMS]
+    return [
+        TermContribution(term=STATE["terms"][i], contribution_log=round(float(scores[i]), 4))
+        for i in order
+    ]
+
+
 @app.post("/predict", response_model=PredictionResponse)
 def predict(req: PredictionRequest) -> PredictionResponse:
     start = time.perf_counter()
     features = req.model_dump()
-    X = prepare_inputs(pd.DataFrame([features]), STATE["encoders"])
+    X = prepare_inputs(pd.DataFrame([features]), STATE["spec"])
     p = float(STATE["model"].predict(X)[0])
     q = STATE["q_log"]
     response = PredictionResponse(
@@ -80,6 +97,8 @@ def predict(req: PredictionRequest) -> PredictionResponse:
         lower_lkr=round(float(np.exp(p - q)), -3),
         upper_lkr=round(float(np.exp(p + q)), -3),
         model_version=MODEL_VERSION,
+        model_support=int(X["model_support"].iloc[0]),
+        top_terms=top_terms(X),
     )
     log_event(
         {
